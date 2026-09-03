@@ -823,6 +823,14 @@ class BaseModel(ABC):
             )
 
             if isinstance(loaded, dict):
+                saved_activation = loaded.get("activation")
+                if (
+                    isinstance(saved_activation, str)
+                    and saved_activation
+                    and getattr(self, "activation", None) is None
+                    and callable(getattr(self, "_apply_activation", None))
+                ):
+                    self._apply_activation(saved_activation)
                 metadata_keys = set(REQUIRED_CHECKPOINT_METADATA_KEYS) - {"model"}
                 if metadata_keys & set(loaded):
                     metadata_errors = validate_checkpoint_metadata(
@@ -1785,6 +1793,8 @@ class BaseModel(ABC):
             imgsz=checkpoint_imgsz,
             **rectangular_metadata,
         )
+        if isinstance(getattr(self, "activation", None), str) and self.activation:
+            checkpoint["activation"] = self.activation
         quant_manifest = getattr(self, "_quant_manifest", None)
         if quant_manifest:
             checkpoint["quant"] = dict(quant_manifest)

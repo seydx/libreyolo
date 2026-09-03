@@ -114,9 +114,26 @@ def _prepare_yolo9_static_eval(nn_model: nn.Module, dummy: torch.Tensor):
         return lambda: None
 
     # Warm-up forward: input values are irrelevant — anchors depend only on
-    # the feature-map geometry, which is fixed by dummy's H/W.
-    with torch.no_grad():
-        nn_model(dummy)
+    # the feature-map geometry, which is fixed by dummy's H/W. The exporter
+    # has already switched the head into export mode, where ``_grid`` skips
+    # the anchors/strides cache entirely, so a fresh model would reach the
+    # freeze below with the empty init tensors. Run the warm-up with export
+    # off so the cache fills.
+    prev_export = head.export
+    prev_shape = head.shape
+    head.export = False
+    head.shape = None
+    try:
+        with torch.no_grad():
+            nn_model(dummy)
+    finally:
+        head.export = prev_export
+        head.shape = prev_shape
+    if head.anchors.ndim != 2:
+        raise RuntimeError(
+            "YOLOv9 anchor cache did not populate during the CoreML warm-up "
+            f"forward (anchors shape {tuple(head.anchors.shape)})."
+        )
 
     frozen_anchors = head.anchors.detach().clone()
     frozen_strides = head.strides.detach().clone()

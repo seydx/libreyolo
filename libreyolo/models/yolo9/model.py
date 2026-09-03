@@ -159,6 +159,7 @@ class LibreYOLO9(BaseModel):
         task: str | None = None,
         **kwargs,
     ):
+        self.activation = kwargs.pop("activation", None)
         self.reg_max = reg_max
         super().__init__(
             model_path=model_path,
@@ -168,12 +169,29 @@ class LibreYOLO9(BaseModel):
             task=task,
             **kwargs,
         )
+        if self.activation:
+            self._apply_activation(self.activation)
         if isinstance(model_path, str):
             self._load_weights(model_path)
 
     # =========================================================================
     # Model lifecycle
     # =========================================================================
+
+    def _apply_activation(self, activation) -> None:
+        """Swap every SiLU activation for the given specifier (e.g. "ReLU").
+
+        YOLOv9 activations are parameter-free, so the swap is state-dict
+        compatible in both directions; the choice is persisted in checkpoint
+        metadata as ``activation``.
+        """
+        from .nn import create_activation
+
+        for module in self.model.modules():
+            for name, child in module.named_children():
+                if isinstance(child, nn.SiLU):
+                    setattr(module, name, create_activation(activation))
+        self.activation = activation
 
     def _init_model(self) -> nn.Module:
         return LibreYOLO9Model(

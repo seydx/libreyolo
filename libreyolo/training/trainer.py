@@ -3085,6 +3085,9 @@ class BaseTrainer(ABC):
             **extra_checkpoint_meta,
         )
         checkpoint.update(self._checkpoint_extra_metadata())
+        wrapper_activation = getattr(self.wrapper_model, "activation", None)
+        if isinstance(wrapper_activation, str) and wrapper_activation:
+            checkpoint["activation"] = wrapper_activation
         quant_manifest = getattr(self.wrapper_model, "_quant_manifest", None)
         if quant_manifest:
             # QAT/QAD checkpoints must be self-describing so LibreYOLO(path)

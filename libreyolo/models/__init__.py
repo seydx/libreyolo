@@ -285,6 +285,7 @@ def LibreYOLO(
     nb_classes: int | None = None,
     device: str = "auto",
     task: str | None = None,
+    activation: str | None = None,
     compute_units: str = "all",
 ):
     """
@@ -300,6 +301,8 @@ def LibreYOLO(
         nb_classes: Number of classes (auto-detected if omitted).
         device: Device for inference ("auto", "cuda", "cpu", "mps").
         task: Optional canonical task name. See ``libreyolo.tasks.TASKS``.
+        activation: YOLOv9-family activation override (e.g. "ReLU"). Defaults
+                    to the checkpoint's saved choice, else SiLU.
         compute_units: CoreML-only — Apple silicon routing for .mlpackage loads.
                        One of "all", "cpu_only", "cpu_and_gpu", "cpu_and_ne".
                        Ignored for non-CoreML formats.
@@ -541,6 +544,7 @@ def LibreYOLO(
                 nb_classes=nb_classes,
                 device=device,
                 task=task,
+                activation=activation,
                 compute_units=compute_units,
             )
 
@@ -743,6 +747,12 @@ def LibreYOLO(
         if matched_cls.FAMILY in ("yolo9", "yolo9_e2e", "yolo9_p2")
         else {}
     )
+    if activation is None and isinstance(loaded, dict):
+        saved_activation = loaded.get("activation")
+        if isinstance(saved_activation, str) and saved_activation:
+            activation = saved_activation
+    if activation and matched_cls.FAMILY in ("yolo9", "yolo9_e2e", "yolo9_p2"):
+        family_kwargs["activation"] = activation
     if matched_cls.FAMILY in ("rfdetr", "dinov2"):
         # RF-DETR / DINOv2 always need the path (handle their own loading internally)
         model = matched_cls(

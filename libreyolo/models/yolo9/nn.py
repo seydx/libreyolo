@@ -546,6 +546,10 @@ class DDetect(nn.Module):
         # after a warm-up forward (see export/coreml.py).
         self.dynamic = False
         self.export = False
+        # Box layout of exported graphs: "xyxy" (default) or "cxcywh", the
+        # layout of the scrypted YOLOv9 exports camera.ui plugins decode.
+        # Inference inside libreyolo stays xyxy either way.
+        self.export_box_format = "xyxy"
         self.shape = None
         self.anchors = torch.empty(0)
         self.strides = torch.empty(0)
@@ -696,6 +700,9 @@ class DDetect(nn.Module):
         boxes = (
             self._decode_bboxes(distances, anchor_points.unsqueeze(0)) * stride_scale
         )
+        if self.export and self.export_box_format == "cxcywh":
+            left_top, right_bottom = boxes.chunk(2, 1)
+            boxes = torch.cat(((left_top + right_bottom) / 2, right_bottom - left_top), 1)
         scores = torch.cat(score_levels, 2).sigmoid()
         return torch.cat((boxes, scores), 1)
 
